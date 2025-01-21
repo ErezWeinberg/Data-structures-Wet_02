@@ -2,64 +2,70 @@
 #include "team.h"
 
 Team::Team(int id) :
-    team_id(id),
-    jockeys(new HashMap<int, Jockey*>()),
-    total_record(0) {}
+    m_team_id(id),
+    m_total_record(0) 
+{
+    m_jockeys = new HashMap<int, Jockey>();
+}
 
 Team::~Team() {
-    delete jockeys;
+    delete m_jockeys;
 }
 
-int Team::getId() const {
-    return team_id;
+int Team::get_id() const {
+    return m_team_id;
 }
 
-int Team::getRecord() const {
-    return total_record;
+int Team::get_record() const {
+    return m_total_record;
 }
 
-int Team::getNumJockeys() const {
-    return jockeys->getSize();
+int Team::get_num_jockeys() const {
+    return m_jockeys->getSize();
 }
 
-void Team::addJockey(Jockey* jockey) {
+void Team::add_jockey(std::shared_ptr<Jockey> jockey) {
     if (jockey == nullptr) return;
 
-    jockeys->insert(jockey->getId(), jockey);
-    total_record += jockey->getRecord();
-    jockey->setTeam(this);
+    m_jockeys->insert(jockey->get_id(), jockey);
+    m_total_record += jockey->get_record();
+    jockey->set_team(std::make_shared<Team>(*this));
 }
 
-void Team::removeJockey(Jockey* jockey) {
+void Team::remove_jockey(Jockey* jockey) {
     if (jockey == nullptr) return;
 
-    if (jockeys->contains(jockey->getId())) {
-        total_record -= jockey->getRecord();
-        jockeys->remove(jockey->getId());
-        jockey->setTeam(nullptr);
+    if (m_jockeys->contains(jockey->get_id())) {
+        m_total_record -= jockey->get_record();
+        m_jockeys->remove(jockey->get_id());
+        jockey->set_team(nullptr);
     }
 }
 
-bool Team::hasJockey(int jockey_id) const {
-    return jockeys->contains(jockey_id);
+bool Team::has_jockey(int jockey_id) const {
+    return m_jockeys->contains(jockey_id);
 }
 
-void Team::updateRecord(int jockey_id, bool won) {
-    Jockey** jockey_ptr = jockeys->get(jockey_id);
+void Team::update_record(int jockey_id, bool won) {
+    std::shared_ptr<Jockey> jockey_ptr = m_jockeys->get(jockey_id);
     if (jockey_ptr != nullptr) {
-        (*jockey_ptr)->updateRecord(won);
+        (jockey_ptr)->update_record(won);
         if (won) {
-            total_record++;
+            m_total_record++;
         } else {
-            total_record--;
+            m_total_record--;
         }
     }
 }
 
+void Team::update_record(int record) {
+    m_total_record = record;
+}
+
 bool Team::operator==(const Team& other) const {
-    return team_id == other.team_id;
+    return m_team_id == other.m_team_id;
 }
 
 bool Team::operator<(const Team& other) const {
-    return team_id < other.team_id;
+    return m_team_id < other.m_team_id;
 }

@@ -5,26 +5,30 @@
 #include "HashMap.h"
 #include "jockey.h"
 
+#include <memory>
+
+
 class Team {
 private:
-    int team_id;
-    HashMap<int, Jockey*>* jockeys; // מיפוי מזהה רוכב לרוכב
-    int total_record; // סכום המאזנים של כל הרוכבים
+    int m_team_id;
+    int m_total_record; // סכום המאזנים של כל הרוכבים
+    HashMap<int, Jockey>* m_jockeys; // מיפוי מזהה רוכב לרוכב
 
 public:
     Team(int id);
     ~Team();
     
     // getters
-    int getId() const;
-    int getRecord() const;
-    int getNumJockeys() const;
+    int get_id() const;
+    int get_record() const;
+    int get_num_jockeys() const;
     
     // פעולות על רוכבים
-    void addJockey(Jockey* jockey);
-    void removeJockey(Jockey* jockey);
-    bool hasJockey(int jockey_id) const;
-    void updateRecord(int jockey_id, bool won);
+    void add_jockey(std::shared_ptr<Jockey> jockey);
+    void remove_jockey(Jockey* jockey);
+    bool has_jockey(int jockey_id) const;
+    void update_record(int jockey_id, bool won);
+    void update_record(int record);
     
     // operators
     bool operator==(const Team& other) const;

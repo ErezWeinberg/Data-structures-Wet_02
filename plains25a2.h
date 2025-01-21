@@ -21,11 +21,11 @@
 
 class Plains {
 private:
-    HashMap<int, Team*>* teams;        // מיפוי מזהה קבוצה לקבוצה
-    HashMap<int, Jockey*>* jockeys;    // מיפוי מזהה רוכב לרוכב
-    UnionFind* teams_union;            // מבנה Union-Find לניהול איחוד קבוצות
-    int total_teams;                   // מספר כולל של קבוצות שנוספו (כולל אלו שאוחדו)
-    int total_jockeys;
+
+    HashMap<int, Jockey>* m_jockeys;    // מיפוי מזהה רוכב לרוכב
+    UnionFind<int, Team>* m_teams_union;            // מבנה Union-Find לניהול איחוד קבוצות
+    int m_total_teams;                   // מספר כולל של קבוצות שנוספו (כולל אלו שאוחדו)
+    int m_total_jockeys;
     
 public:
     // <DO-NOT-MODIFY> {-----------------

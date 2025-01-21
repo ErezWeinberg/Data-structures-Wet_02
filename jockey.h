@@ -2,28 +2,30 @@
 #ifndef JOCKEY_H
 #define JOCKEY_H
 
+#include <memory>
+
 class Team; // forward declaration
 
 class Jockey {
 private:
-    int jockey_id;
-    Team* team;
-    int record; // מאזן אישי (ניצחונות - הפסדים)
+    int m_jockey_id;
+    std::shared_ptr<Team> m_team;
+    int m_record; // מאזן אישי (ניצחונות - הפסדים)
 
 public:
-    Jockey(int id, Team* t = nullptr);
+    Jockey(int id, std::shared_ptr<Team> t = nullptr);
     ~Jockey() = default;
     
     // getters
-    int getId() const;
-    Team* getTeam() const;
-    int getRecord() const;
+    int get_id() const;
+    std::shared_ptr<Team> get_team() const;
+    int get_record() const;
     
     // setters
-    void setTeam(Team* new_team);
+    void set_team(std::shared_ptr<Team> new_team);
     
     // עדכון המאזן
-    void updateRecord(bool won); // true לניצחון, false להפסד
+    void update_record(bool won); // true לניצחון, false להפסד
     
     // operators
     bool operator==(const Jockey& other) const;

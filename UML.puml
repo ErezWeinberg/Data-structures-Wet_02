@@ -1,0 +1,83 @@
+@startuml UML
+
+enum StatusType {
+    SUCCESS
+    ALLOCATION_ERROR
+    INVALID_INPUT
+    FAILURE
+}
+
+class output_t<T> {
+    - StatusType __status
+    - T __ans
+    + status(): StatusType
+    + ans(): T
+}
+
+class Team {
+    - int m_team_id
+    - int m_total_record
+    - HashMap<int, Jockey>* m_jockeys
+    + get_id(): int
+    + get_record(): int
+    + add_jockey(jockey: Jockey)
+    + remove_jockey(jockey: Jockey)
+}
+
+class Jockey {
+    - int m_jockey_id
+    - Team m_team
+    - int m_record
+    + get_id(): int
+    + get_team(): Team
+    + get_record(): int
+    + set_team(new_team: Team)
+    + update_record(won: bool)
+}
+
+class Plains {
+    - HashMap<int, Jockey>* m_jockeys
+    - UnionFind<int, Team>* m_teams_union
+    - int m_total_teams
+    - int m_total_jockeys
+    + add_team(teamId: int): StatusType
+    + add_jockey(jockeyId: int, teamId: int): StatusType
+    + update_match(victoriousJockeyId: int, losingJockeyId: int): StatusType
+    + merge_teams(teamId1: int, teamId2: int): StatusType
+    + unite_by_record(record: int): StatusType
+    + get_jockey_record(jockeyId: int): output_t<int>
+    + get_team_record(teamId: int): output_t<int>
+}
+
+class HashMap<K, V> {
+    - Bucket<K, V>* buckets
+    - int m_size
+    - int m_capacity
+    + insert(key: K, value: V)
+    + get(key: K): V
+    + contains(key: K): bool
+    + remove(key: K)
+    + getSize(): int
+}
+
+class UnionFind<K, T> {
+    - HashMap<K, Node> m_elements
+    - HashMap<int, Node> m_record_map
+    + make_set(id: K, element: T)
+    + find(id: K): T
+    + union_sets(id1: K, id2: K): bool
+    + are_same_set(id1: K, id2: K): bool
+    + get_size(id: K): int
+    + get_record(id: K): int
+    + unite_by_record(record: int): bool
+}
+
+Team "1" *-- "1..*" Jockey : manages
+Plains "1" *-- "1" HashMap<int, Jockey> : contains
+Plains "1" *-- "1" UnionFind<int, Team> : manages
+UnionFind "1" *-- "1..*" Team : tracks
+HashMap "1" o-- "*" Jockey
+HashMap "1" o-- "*" Team
+output_t "1" <-- "1" Plains : returns
+
+@enduml
