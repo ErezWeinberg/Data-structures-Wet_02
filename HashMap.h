@@ -1,146 +1,158 @@
-#ifndef HASHMAP_H
-#define HASHMAP_H
+#pragma once
 
-#include <cmath>
+#include <functional>
 #include <memory>
+#include <cmath>
 
-bool isPrime(int n) {
-    if (n <= 1) return false;
-    for (int i = 2; i <= std::sqrt(n); ++i) {
-        if (n % i == 0) return false;
-    }
-    return true;
-}
+#include "List.h"
 
-template<typename K, typename V>
-struct Bucket {
-    K key;
-    std::shared_ptr<V> value;
+using namespace std;
+
+// Define a structure for each bucket in the hash table
+template<typename ValueType>
+struct HashBucket {
+    int key;
+    List<ValueType*> values; // Changed from List<shared_ptr<ValueType>>
     bool occupied;
-    ~Bucket() = default;
+
+    HashBucket() : key(0), occupied(false) {} // 'occupied' indicates if 'key' is initialized
 };
 
-template<typename K, typename V>
+// HashMap class with integer keys and generic values
+template<typename ValueType>
 class HashMap {
 private:
-    Bucket<K, V>* buckets;
-    int m_size;
-    int m_capacity;
-    const static int INITIAL_SIZE = 10007; // מספר ראשוני
+    HashBucket<ValueType>* buckets; // Array of hash buckets
 
-    int hash(const K& m_key) const;
-    void resize();
+    int size;
+    int capacity;
+
+    static constexpr int INITIAL_CAPACITY = 10007; // Prime number for initial capacity
+
+    // Compute hash index for a given key
+    int compute_hash(int key) const;
+
+    // Expand and rehash the table when load factor is exceeded
+    void expand_table();
 
 public:
     HashMap();
     ~HashMap();
 
-    void insert(const K& m_key, std::shared_ptr<V> m_value);
-    std::shared_ptr<V> get(const K& m_key);
-    bool contains(const K& m_key);
-    void remove(const K& m_key);
-    int getSize() const;
+    // Add a key-value pair to the hash map
+    void insert(int key, ValueType* value); // Changed parameter type
+
+    // Retrieve values associated with a key
+    ValueType* get_values(int key) const; // Changed return type
+
+    // Check if a key exists in the hash map
+    bool contains(int key) const;
+
+    // Remove a specific key-value pair
+    void remove_pair(int key, ValueType* value); // Changed parameter type
+
+    // Get the number of key-value pairs in the hash map
+    int get_size() const;
+
+    // Check if we have duplicates with the same key
+    bool check_duplicates(const int key) const;
 };
 
 // Implementations
 
-template<typename K, typename V>
-int HashMap<K, V>::hash(const K& m_key) const {
-    return (m_key % m_capacity + m_capacity) % m_capacity;
+template<typename ValueType>
+HashMap<ValueType>::HashMap() : size(0), capacity(INITIAL_CAPACITY) {
+    buckets = new HashBucket<ValueType>[capacity];
 }
 
-template<typename K, typename V>
-void HashMap<K, V>::resize() {
-    int old_capacity = m_capacity;
-    Bucket<K, V>* old_buckets = buckets;
-
-    // שמירה על קיבולת ראשונית
-    m_capacity = m_capacity * 2 + 1;
-    while (!isPrime(m_capacity)) {
-        m_capacity += 1;
-    }
-
-    buckets = new Bucket<K, V>[m_capacity]();
-    m_size = 0;
-    for (int i = 0; i < old_capacity; ++i) {
-        if (old_buckets[i].occupied) {
-            insert(old_buckets[i].key, old_buckets[i].value);
-        }
-    }
-    delete[] old_buckets;
-}
-
-template<typename K, typename V>
-HashMap<K, V>::HashMap() : m_size(0), m_capacity(INITIAL_SIZE) {
-    buckets = new Bucket<K, V>[m_capacity]();
-}
-
-template<typename K, typename V>
-HashMap<K, V>::~HashMap() {
+template<typename ValueType>
+HashMap<ValueType>::~HashMap() {
     delete[] buckets;
 }
 
-template<typename K, typename V>
-void HashMap<K, V>::insert(const K& m_key, std::shared_ptr<V> m_value) {
-    if (m_size >= m_capacity * 0.75) {
-        resize();
-    }
-
-    int index = hash(m_key);
-    while (buckets[index].occupied) {
-        if (buckets[index].key == m_key) {
-            buckets[index].value = m_value;
-            return;
-        }
-        index = (index + 1) % m_capacity;
-    }
-
-    buckets[index].key = m_key;
-    buckets[index].value = m_value;
-    buckets[index].occupied = true;
-    m_size++;
+template<typename ValueType>
+int HashMap<ValueType>::compute_hash(int key) const {
+    // Ensures that negative keys are handled correctly by mapping them within [0, capacity-1]
+    return ((key % capacity) + capacity) % capacity;
 }
 
-template<typename K, typename V>
-std::shared_ptr<V> HashMap<K, V>::get(const K& m_key) {
-    int index = hash(m_key);
-    while (buckets[index].occupied) {
-        if (buckets[index].key == m_key) {
-            return buckets[index].value;
+template<typename ValueType>
+void HashMap<ValueType>::expand_table() {
+    int old_capacity = capacity;
+    capacity *= 2;
+    HashBucket<ValueType>* new_buckets = new HashBucket<ValueType>[capacity];
+
+    for (int i = 0; i < old_capacity; ++i) {
+        if (buckets[i].occupied) {
+            for (auto& valPtr : buckets[i].values) {
+                int new_index = compute_hash(buckets[i].key);
+                if (!new_buckets[new_index].occupied) {
+                    new_buckets[new_index].key = buckets[i].key;
+                    new_buckets[new_index].occupied = true;
+                }
+                new_buckets[new_index].values.push_back(valPtr);
+            }
         }
-        index = (index + 1) % m_capacity;
     }
-    return nullptr;
+
+    delete[] buckets;
+    buckets = new_buckets;
 }
 
-template<typename K, typename V>
-bool HashMap<K, V>::contains(const K& m_key) {
-    int index = hash(m_key);
-    while (buckets[index].occupied) {
-        if (buckets[index].key == m_key) {
-            return true;
-        }
-        index = (index + 1) % m_capacity;
+template<typename ValueType>
+void HashMap<ValueType>::insert(int key, ValueType* value) { // Changed parameter type
+    if (static_cast<float>(size) / capacity > 0.75f) {
+        expand_table();
     }
-    return false;
+
+    int index = compute_hash(key);
+    if (buckets[index].occupied && buckets[index].key == key) {
+        buckets[index].values.push_back(value);
+        size++;
+    } else {
+        buckets[index].key = key;
+        buckets[index].values.push_back(value);
+        buckets[index].occupied = true;
+        size++;
+    }
 }
 
-template<typename K, typename V>
-void HashMap<K, V>::remove(const K& m_key) {
-    int index = hash(m_key);
-    while (buckets[index].occupied) {
-        if (buckets[index].key == m_key) {
+template<typename ValueType>
+ValueType* HashMap<ValueType>::get_values(int key) const { // Changed return type
+    int index = compute_hash(key);
+    if (buckets[index].occupied && buckets[index].key == key) {
+        if (buckets[index].values.size() == 1) { // Check if only one entry exists
+            return *buckets[index].values.begin(); // Return the first ValueType* if exists
+        }
+    }
+    return nullptr; // Return nullptr if not exactly one entry found
+}
+
+template<typename ValueType>
+bool HashMap<ValueType>::contains(int key) const {
+    int index = compute_hash(key);
+    return buckets[index].occupied && buckets[index].key == key;
+}
+
+template<typename ValueType>
+void HashMap<ValueType>::remove_pair(int key, ValueType* value) { // Changed parameter type
+    int index = compute_hash(key);
+    if (buckets[index].occupied) {
+        buckets[index].values.remove(value);
+        if (buckets[index].values.empty()) {
             buckets[index].occupied = false;
-            m_size--;
-            return;
+            size--;
         }
-        index = (index + 1) % m_capacity;
     }
 }
 
-template<typename K, typename V>
-int HashMap<K, V>::getSize() const {
-    return m_size;
+template<typename ValueType>
+int HashMap<ValueType>::get_size() const {
+    return size;
 }
 
-#endif //HASHMAP_H
+template<typename ValueType>
+bool HashMap<ValueType>::check_duplicates(const int key) const {
+    int index = compute_hash(key);
+    return buckets[index].values.size() > 1;
+}
