@@ -2,226 +2,188 @@
 #define UNIONFIND_H
 
 #include "HashMap.h"
+#include "Participant.h"
 #include <memory>
 
-// K - is the id V - is the Team or Jockey 
-// each Team or Jockey has a record and methods to get and update the record
-template<typename K, typename T>
+using namespace std;
+
 class UnionFind {
 private:
     class Node {
     public:
-        K id;
-        std::shared_ptr<Node> parent;
-        int m_size;
-        int rank;
-        std::shared_ptr<T> element;
-        std::shared_ptr<Node> next; // Pointer for linked list in m_record_map
+        int id;
+        int record;
+        bool isTeam;
+        Node* parent;
+        shared_ptr<Participant> participant;
 
-        Node(K id, std::shared_ptr<T> element);
+        Node(int id, bool isTeam) : id(id), record(0), isTeam(isTeam), parent(nullptr), participant(nullptr) {}
+        
+        Node* findRoot() {
+            if (parent == nullptr) {
+                return this;
+            }
+            parent = parent->findRoot();
+            return parent;
+        }
     };
 
-    HashMap<K, std::shared_ptr<Node>> m_elements; // Use HashMap for O(1) access by id
-    HashMap<int, std::shared_ptr<Node>> m_record_map; // HashMap to maintain records and their nodes (linked list)
-    int m_size;
-    int m_max_size;
+    HashMap<Node> teamMap;
+    HashMap<Node> jockeyMap;
 
-    std::shared_ptr<Node> findRootNode(std::shared_ptr<Node> node);
-    bool link(std::shared_ptr<Node> node1, std::shared_ptr<Node> node2);
-    void add_to_record_map(int record, std::shared_ptr<Node> node);
-    void remove_from_record_map(int record);
+    int size;
+    int maxSize;
+
+    Node* findRoot(Node* node);
+    void linkNodes(Node* node1, Node* node2);
+
+    friend class Plains;
 
 public:
-
     UnionFind();
-    ~UnionFind() = default;
+    ~UnionFind();
 
-    void make_set(K id, std::shared_ptr<T> element);
-    std::shared_ptr<T> find(K id);
-    bool union_sets(K id1, K id2);
-    bool are_same_set(K id1, K id2);
-    int get_size(K id);
-    int get_record(K id);
-    bool update_record(K victory_id, K lose_id);
-    bool unite_by_record(int record);
-    std::shared_ptr<T> find_root(K id);
-    std::shared_ptr<T> find_root(std::shared_ptr<Node> node);
+    void addTeam(int id);
+    bool addJockey(int jockeyId, int teamId);
+    bool updateMatch(int winnerId, int loserId);
+    bool teamsExist(int teamId1, int teamId2);
+    bool mergeTeams(int teamId1, int teamId2);
+    bool uniteByRecord(int record);
+    Node* getTeamNode(int teamId);
+    int getTeamOfJockey(int jockeyId);
+    int getJockeyRecord(int jockeyId);
+    Node* getJockeyNode(int jockeyId);
+    int fetchJockeyRecord(int jockeyId);
+    int fetchTeamRecord(int teamId);
 };
 
-// Implementation
+// Implementations
 
-// Node constructor
-template<typename K, typename T>
-UnionFind<K, T>::Node::Node(K id, std::shared_ptr<T> element)
-    : id(id), parent(this), m_size(1), rank(0), element(element), next(nullptr) {}
+UnionFind::UnionFind() : teamMap(), jockeyMap(), size(0), maxSize(0) {}
 
-// Returns the root std::shared_ptr<Node> (path compression)
-template<typename K, typename T>
-std::shared_ptr<typename UnionFind<K, T>::Node> UnionFind<K, T>::findRootNode(std::shared_ptr<typename UnionFind<K, T>::Node> node) {
-    if (node->parent != node) {
-        node->parent = findRootNode(node->parent);
+UnionFind::~UnionFind() {
+    for (int i = 0; i < teamMap.get_size(); ++i) {
+        Node* node = teamMap.get_values(i);
+        delete node;
     }
+    for (int i = 0; i < jockeyMap.get_size(); ++i) {
+        Node* node = jockeyMap.get_values(i);
+        delete node;
+    }
+}
+
+UnionFind::Node* UnionFind::findRoot(Node* node) {
+    if (node->parent == nullptr) {
+        return node;
+    }
+    node->parent = findRoot(node->parent);
     return node->parent;
 }
 
-// Returns the root element as std::shared_ptr<T>
-template<typename K, typename T>
-std::shared_ptr<T> UnionFind<K, T>::find_root(K id) {
-    if (!m_elements.contains(id)) {
-        return nullptr;
+void UnionFind::addTeam(int id) {
+    if (!teamMap.contains(id)) {
+        Node* newTeam = new Node(id, true);
+        teamMap.insert(id, newTeam);
     }
-    std::shared_ptr<Node> node = *m_elements.get(id);
-    std::shared_ptr<Node> root = findRootNode(node);
-    return root->element;
-}
-// Returns the root element as std::shared_ptr<T>
-template<typename K, typename T>
-std::shared_ptr<T> UnionFind<K, T>::find_root(std::shared_ptr<Node> node) {
-    if (!m_elements.contains(node->id)) {
-        return nullptr;
-    }
-    std::shared_ptr<Node> root = findRootNode(node);
-    if(root == nullptr) return nullptr;
-    return root->element;
 }
 
-// Link two nodes by rank
-template<typename K, typename T>
-bool UnionFind<K, T>::link(std::shared_ptr<Node> node1, std::shared_ptr<Node> node2) 
-{
-    if (node1 == nullptr || node2 == nullptr) return false;
-    if (node1->size <= node2->size){
-        std::shared_ptr<Node> temp = node1;
-        node1 = node2;
-        node2 = temp;
+bool UnionFind::addJockey(int jockeyId, int teamId) {
+    if (!teamMap.contains(teamId) || jockeyMap.contains(jockeyId)) {
+        return false;
     }
-    node2->parent = node1;
-    node1->m_size += node2->m_size;
-    node1->element->update_record(node2->element->get_record() - node1->element->get_record());
-    remove_from_record_map(node2->element->get_record());
-    add_to_record_map(node1->element->get_record(), node1);
+    Node* teamNode = teamMap.get_values(teamId);
+    Node* newJockey = new Node(jockeyId, false);
+    jockeyMap.insert(jockeyId, newJockey);
+    linkNodes(findRoot(teamNode), findRoot(newJockey));
     return true;
 }
 
-// Add node to record map
-template<typename K, typename T>
-void UnionFind<K, T>::add_to_record_map(int record, std::shared_ptr<Node> node) {
-    std::shared_ptr<Node> head = m_record_map.get(record);
-    node->next = head;
-    m_record_map.insert(record, node);
-}
+bool UnionFind::updateMatch(int winnerId, int loserId) {
+    Node* winner = getJockeyNode(winnerId);
+    Node* loser = getJockeyNode(loserId);
+    if (!winner || !loser) return false;
 
-// Remove node from record map
-template<typename K, typename T>
-void UnionFind<K, T>::remove_from_record_map(int record) {
-    // Implementation to remove a node from the linked list if needed
-}
+    Node* rootWin = findRoot(winner);
+    Node* rootLose = findRoot(loser);
+    if (rootWin == rootLose) return false;
 
-// Constructor
-template<typename K, typename T>
-UnionFind<K, T>::UnionFind() : m_size(1000), m_max_size(m_max_size), m_elements(), m_record_map() {}
+    winner->record += 1;
+    loser->record -= 1;
 
-// Make set
-template<typename K, typename T>
-void UnionFind<K, T>::make_set(K id, std::shared_ptr<T> element) {
-    if (m_elements.contains(id)) return;
-
-    std::shared_ptr<Node> new_node = std::make_shared<Node>(id, element);
-    m_elements.insert(id, ((new_node)->element));
-    add_to_record_map(element->get_record(), new_node);
-    m_size++;
-}
-
-// Find set and return element
-template<typename K, typename T>
-std::shared_ptr<T> UnionFind<K, T>::find(K id) 
-{
-    if (!m_elements.contains(id)) return nullptr;
-    std::shared_ptr<Node> node = *m_elements.get(id);
-    if(node == nullptr) return nullptr;
-    return node->element;
-}
-
-// Union sets
-template<typename K, typename T>
-bool UnionFind<K, T>::union_sets(K id1, K id2) 
-{
-    if (!m_elements.contains(id1) || !m_elements.contains(id2)) {
-        return false;
+    if (rootWin->isTeam) {
+        rootWin->record += 1;
     }
-    
-    std::shared_ptr<Node> node1 = *m_elements.get(id1);
-    std::shared_ptr<Node> node2 = *m_elements.get(id2);
-
-    return link(node1, node2);
-}
-
-// Are same set
-template<typename K, typename T>
-bool UnionFind<K, T>::are_same_set(K id1, K id2) {
-    if (!m_elements.contains(id1) || !m_elements.contains(id2)) {
-        return false;
+    if (rootLose->isTeam) {
+        rootLose->record -= 1;
     }
-    std::shared_ptr<Node> node1 = *m_elements.get(id1);
-    std::shared_ptr<Node> node2 = *m_elements.get(id2);
-    return findRootNode(node1) == findRootNode(node2);
-}
-
-// Get size
-template<typename K, typename T>
-int UnionFind<K, T>::get_size(K id) {
-    if (!m_elements.contains(id)) return 0;
-    std::shared_ptr<Node> node = *m_elements.get(id);
-    std::shared_ptr<Node> rootNode = findRootNode(node);
-    return rootNode->m_size;
-}
-
-// Get record
-template<typename K, typename T>
-int UnionFind<K, T>::get_record(K id) {
-    if (!m_elements.contains(id)) return -1;
-    std::shared_ptr<Node> node = *m_elements.get(id);
-    std::shared_ptr<Node> rootNode = findRootNode(node);
-    return rootNode->element->get_record();
-}
-
-// Update record
-template<typename K, typename T>
-bool UnionFind<K, T>::update_record(K victory_id, K lose_id) {
-    int root_victory = find(victory_id);
-    int root_lose = find(lose_id);
-
-    if (root_victory == -1 || root_lose == -1) return false;
-
-    std::shared_ptr<Node> node_victory = *m_elements.get(root_victory);
-    std::shared_ptr<Node> node_lose = *m_elements.get(root_lose);
-
-    remove_from_record_map(node_victory->element->get_record());
-    remove_from_record_map(node_lose->element->get_record());
-
-    node_victory->element->update_record(true);
-    node_lose->element->update_record(false);
-
-    add_to_record_map(node_victory->element->get_record(), node_victory);
-    add_to_record_map(node_lose->element->get_record(), node_lose);
 
     return true;
 }
 
-// Unite by record
-template<typename K, typename T>
-bool UnionFind<K, T>::unite_by_record(int record) 
-{
-    auto positive_node = m_record_map.get(record);
-    auto negative_node = m_record_map.get(-record);
+bool UnionFind::teamsExist(int teamId1, int teamId2) {
+    return teamMap.contains(teamId1) && teamMap.contains(teamId2);
+}
 
-    positive_node = dynamic_cast<Node*>(positive_node);
-    negative_node = dynamic_cast<Node*>(negative_node);
-    
-    if (positive_node && negative_node) {
-        return union_sets(positive_node->id, negative_node->id);   
-    }    
+bool UnionFind::mergeTeams(int teamId1, int teamId2) {
+    Node* t1 = getTeamNode(teamId1);
+    Node* t2 = getTeamNode(teamId2);
+    if (!t1 || !t2) return false;
+    Node* r1 = findRoot(t1);
+    Node* r2 = findRoot(t2);
+    if (r1 == r2) return false;
+    linkNodes(r1, r2);
+    return true;
+}
+
+bool UnionFind::uniteByRecord(int record) {
+    // Implementation as needed
     return false;
+}
+
+UnionFind::Node* UnionFind::getTeamNode(int teamId) {
+    return teamMap.contains(teamId) ? teamMap.get_values(teamId) : nullptr;
+}
+
+int UnionFind::getTeamOfJockey(int jockeyId) {
+    Node* jockey = getJockeyNode(jockeyId);
+    if (!jockey) return -1;
+    Node* root = findRoot(jockey);
+    return root->isTeam ? root->id : -1;
+}
+
+int UnionFind::getJockeyRecord(int jockeyId) {
+    Node* jockey = getJockeyNode(jockeyId);
+    return jockey ? jockey->record : 0;
+}
+
+UnionFind::Node* UnionFind::getJockeyNode(int jockeyId) {
+    return jockeyMap.contains(jockeyId) ? jockeyMap.get_values(jockeyId) : nullptr;
+}
+
+int UnionFind::fetchJockeyRecord(int jockeyId) {
+    Node* jockey = getJockeyNode(jockeyId);
+    return jockey ? jockey->record : 0;
+}
+
+int UnionFind::fetchTeamRecord(int teamId) {
+    Node* team = getTeamNode(teamId);
+    return team ? findRoot(team)->record : 0;
+}
+
+void UnionFind::linkNodes(Node* rootA, Node* rootB) {
+    if (rootA->id < rootB->id) {
+        rootB->parent = rootA;
+        if (rootA->isTeam && rootB->isTeam) {
+            rootA->record += rootB->record;
+            rootB->record = 0; 
+        }
+    } else {
+        rootA->parent = rootB;
+        if (rootA->isTeam && rootB->isTeam) {
+            rootB->record += rootA->record;
+            rootA->record = 0; 
+        }
+    }
 }
 
 #endif // UNIONFIND_H

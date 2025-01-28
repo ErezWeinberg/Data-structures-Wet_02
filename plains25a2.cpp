@@ -3,153 +3,125 @@
 
 #include "plains25a2.h"
 
-// סעיף 1
-Plains::Plains() {
-    // אתחול טבלת גיבוב לשמירת הרוכבים
-    m_jockeys = new HashMap<int, Jockey>();
-    // אתחול מבנה Union-Find לניהול איחוד קבוצות
-    m_teams_union = new UnionFind<int, Team>();
-    // אתחול מונה הקבוצות הכולל (כולל אלו שאוחדו)
-    m_total_teams = 0;
-    // אתחול מונה הרוכבים הכולל
-    m_total_jockeys = 0;
-};
-// הדסטרוקטור
+// Remove any UnionFind definitions that might be here and keep only Plains methods.
+
+Plains::Plains() : m_unionFind(), m_recordMap() {
+    // Initialize m_recordMap if necessary
+}
+
 Plains::~Plains() {
-    delete m_jockeys;
-    delete m_teams_union;
+    // ...existing code...
 }
 
+// Add a new team. Initialize its record to 0 in m_recordMap
+StatusType Plains::add_team(int teamId) {
+    if (teamId <= 0) return StatusType::INVALID_INPUT;
+    // Check existence
+    if (m_unionFind.getTeamNode(teamId) || m_recordMap.contains(teamId)) {
+        return StatusType::FAILURE;
+    }
+    m_unionFind.addTeam(teamId);
+    // Add to m_recordMap with initial record 0
+    UnionFind::Node* newTeamNode = new UnionFind::Node(teamId, true);
+    m_recordMap.insert(teamId, newTeamNode);
+    return StatusType::SUCCESS;
+}
 
-StatusType Plains::add_team(int team_id) {
-    // בדיקת תקינות קלט
-    if (team_id <= 0) {
+// Add a jockey with ID jockeyId, link to teamId
+StatusType Plains::add_jockey(int jockeyId, int teamId) {
+    if (jockeyId <= 0 || teamId <= 0) return StatusType::INVALID_INPUT;
+    if (!m_unionFind.addJockey(jockeyId, teamId)) {
+        return StatusType::FAILURE; 
+    }
+    return StatusType::SUCCESS;
+}
+
+// Update match results and manage team records via m_recordMap
+StatusType Plains::update_match(int victoriousJockeyId, int losingJockeyId) {
+    if (victoriousJockeyId <= 0 || losingJockeyId <= 0 
+        || victoriousJockeyId == losingJockeyId) {
         return StatusType::INVALID_INPUT;
     }
-    // בדיקה אם הקבוצה כבר קיימת
-    if (m_teams_union->find(team_id) == nullptr) {
+    if (!m_unionFind.updateMatch(victoriousJockeyId, losingJockeyId)) {
         return StatusType::FAILURE;
     }
-    try {
-        // יצירת קבוצה חדשה
-        std::shared_ptr<Team> new_team = std::make_shared<Team>(team_id);
-        // הוספה למבנה Union-Find
-        m_teams_union->make_set(team_id, new_team);
-        // עדכון מונה הקבוצות
-        m_total_teams++;
-        return StatusType::SUCCESS;
-    } catch (const std::bad_alloc&) {
-        return StatusType::ALLOCATION_ERROR;
+    // Fetch the teams of both jockeys
+    int teamWin = m_unionFind.getTeamOfJockey(victoriousJockeyId);
+    int teamLose = m_unionFind.getTeamOfJockey(losingJockeyId);
+    
+    // Update team records
+    UnionFind::Node* teamWinNode = m_recordMap.get_values(teamWin);
+    UnionFind::Node* teamLoseNode = m_recordMap.get_values(teamLose);
+    if (teamWinNode) {
+        teamWinNode->record += 1;
     }
+    if (teamLoseNode) {
+        teamLoseNode->record -= 1;
+    }
+    return StatusType::SUCCESS;
 }
 
-StatusType Plains::add_jockey(int jockey_id, int team_id) {
-    if (jockey_id <= 0 || team_id <= 0) {
+// Merge two teams and manage their records via m_recordMap
+StatusType Plains::merge_teams(int teamId1, int teamId2) {
+    if (teamId1 <= 0 || teamId2 <= 0 || teamId1 == teamId2) {
         return StatusType::INVALID_INPUT;
     }
-
-    if (m_jockeys->contains(jockey_id) || m_teams_union->find(team_id) == nullptr) {
+    if (!m_unionFind.teamsExist(teamId1, teamId2)) {
         return StatusType::FAILURE;
     }
+    // Determine the new team ID based on records
+    UnionFind::Node* team1 = m_recordMap.get_values(teamId1);
+    UnionFind::Node* team2 = m_recordMap.get_values(teamId2);
+    if (!team1 || !team2) return StatusType::FAILURE;
 
-    try {
-        std::shared_ptr<Team> team = m_teams_union->find(team_id);
-        std::shared_ptr<Jockey> new_jockey = std::make_shared<Jockey>(jockey_id, team); // יצירת רוכב חדש 
-        m_jockeys->insert(jockey_id, new_jockey);
-        team->add_jockey(new_jockey);
-        m_total_jockeys++;
-        return StatusType::SUCCESS;
-    } catch (const std::bad_alloc&) {
-        return StatusType::ALLOCATION_ERROR;
+    int record1 = team1->record;
+    int record2 = team2->record;
+    int newTeamId = (record1 > record2) ? teamId1 : (record2 > record1) ? teamId2 : teamId1;
+    int mergedTeamId = (newTeamId == teamId1) ? teamId2 : teamId1;
+    
+    // Merge teams in UnionFind
+    if (!m_unionFind.mergeTeams(teamId1, teamId2)) {
+        return StatusType::FAILURE;
     }
+    
+    // Reset the merged team's record to 0 and remove it from m_recordMap
+    m_recordMap.remove_pair(mergedTeamId, m_recordMap.get_values(mergedTeamId));
+    return StatusType::SUCCESS;
 }
 
-StatusType Plains::update_match(int victorious_jockey_id, int losing_jockey_id) {
-    if (victorious_jockey_id <= 0 || losing_jockey_id <= 0 ||
-        victorious_jockey_id == losing_jockey_id) {
-        return StatusType::INVALID_INPUT;
-    }
-
-    std::shared_ptr<Jockey> victor_ptr = m_jockeys->get(victorious_jockey_id);
-    std::shared_ptr<Jockey> loser_ptr = m_jockeys->get(losing_jockey_id);
-
-    if (victor_ptr == nullptr || loser_ptr == nullptr) {
-        return StatusType::FAILURE;
-    }
-
-    // בדיקה שהרוכבים לא באותה קבוצה
-    if (m_teams_union->find(victor_ptr->get_team()->get_id()) ==
-        m_teams_union->find(loser_ptr->get_team()->get_id())) {
-        return StatusType::FAILURE;
-    }
-
-    try {
-        victor_ptr->update_record(true);  // עדכון ניצחון
-        loser_ptr->update_record(false);  // עדכון הפסד
-        return StatusType::SUCCESS;
-    } catch (const std::bad_alloc&) {
-        return StatusType::ALLOCATION_ERROR;
-    }
-}
-
-StatusType Plains::merge_teams(int team_id1, int team_id2) {
-    if (team_id1 <= 0 || team_id2 <= 0 || team_id1 == team_id2) {
-        return StatusType::INVALID_INPUT;
-    }
-
-    std::shared_ptr<Team> team1_ptr = m_teams_union->find(team_id1);
-    std::shared_ptr<Team> team2_ptr = m_teams_union->find(team_id2);
-
-    if (team1_ptr == nullptr || team2_ptr == nullptr) {
-        return StatusType::FAILURE;
-    }
-
-    try {
-        // עדכון הקבוצה הגדולה במספר רוכבים
-        m_teams_union->union_sets(team_id1, team_id2);
-
-        return StatusType::SUCCESS;
-
-    } catch (const std::bad_alloc&) {
-        return StatusType::ALLOCATION_ERROR;
-    }
-}
-
+// If exactly one team with record=record and exactly one with record=-record, merge them
 StatusType Plains::unite_by_record(int record) {
-    if (record <= 0) {
-        return StatusType::INVALID_INPUT;
+    if (record <= 0) return StatusType::INVALID_INPUT;
+    if (!m_unionFind.uniteByRecord(record)) {
+        return StatusType::FAILURE;
     }
-
-    return m_teams_union->unite_by_record(record) ?
-           StatusType::SUCCESS : StatusType::FAILURE;    
-
+    return StatusType::SUCCESS;
 }
 
-
-output_t<int> Plains::get_jockey_record(int jockey_id) {
-    if (jockey_id <= 0) {
-        return output_t<int>(StatusType::INVALID_INPUT);
-    }
-
-    std::shared_ptr<Jockey> jockey_ptr = m_jockeys->get(jockey_id);
-
-    if (jockey_ptr == nullptr) {
+// Fetch and return a jockey's record with modified logic
+output_t<int> Plains::get_jockey_record(int jockeyId) {
+    if (jockeyId <= 0) return output_t<int>(StatusType::INVALID_INPUT);
+    // Validate jockey existence
+    if (m_unionFind.getJockeyNode(jockeyId) == nullptr) {
         return output_t<int>(StatusType::FAILURE);
     }
 
-    return output_t<int>((jockey_ptr)->get_record());
+    int recordValue = m_unionFind.getJockeyRecord(jockeyId);
+    return output_t<int>(recordValue);
 }
 
-output_t<int> Plains::get_team_record(int team_id) {
-    if (team_id <= 0) {
-        return output_t<int>(StatusType::INVALID_INPUT);
-    }
-
-    std::shared_ptr<Team> team_ptr = m_teams_union->find(team_id);
-
-    if (team_ptr == nullptr) {
+// get the record for a team
+output_t<int> Plains::get_team_record(int teamId) {
+    if (teamId <= 0) return output_t<int>(StatusType::INVALID_INPUT);
+    // Team must exist
+    UnionFind::Node* teamNode = m_recordMap.get_values(teamId);
+    if (!teamNode) {
         return output_t<int>(StatusType::FAILURE);
     }
-
-    return output_t<int>((team_ptr)->get_record());
+    int record = teamNode->record;
+    return output_t<int>(record);
 }
+
+// ...existing code...
+
+

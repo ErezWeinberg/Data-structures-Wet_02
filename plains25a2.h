@@ -16,17 +16,13 @@
 #include "wet2util.h"
 #include "HashMap.h"
 #include "UnionFind.h"
-#include "team.h"
-#include "jockey.h"
+#include "Participant.h"
 
 class Plains {
 private:
+    UnionFind m_unionFind;
+    HashMap<UnionFind::Node> m_recordMap;
 
-    HashMap<int, Jockey>* m_jockeys;    // מיפוי מזהה רוכב לרוכב
-    UnionFind<int, Team>* m_teams_union;            // מבנה Union-Find לניהול איחוד קבוצות
-    int m_total_teams;                   // מספר כולל של קבוצות שנוספו (כולל אלו שאוחדו)
-    int m_total_jockeys;
-    
 public:
     // <DO-NOT-MODIFY> {-----------------
     Plains();
@@ -41,4 +37,4 @@ public:
     // } </DO-NOT-MODIFY>---------------
 };
 
-#endif // PLAINS25WINTER_WET1_H_
+#endif // PLAINS25A2_H
