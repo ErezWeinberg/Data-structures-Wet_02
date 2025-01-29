@@ -8,24 +8,27 @@
 
 using namespace std;
 
-// Define a structure for each bucket in the hash table
 template<typename ValueType>
-struct HashBucket {
-    int key;
-    List<ValueType*> values; // Changed from List<shared_ptr<ValueType>>
-    bool occupied;
+struct HashNode {
+    int m_key;
+    ValueType* m_value; 
 
-    HashBucket() : key(0), occupied(false) {} // 'occupied' indicates if 'key' is initialized
+    HashNode() : m_key(0), m_value(nullptr) {} 
+
+    bool operator==(const HashNode<ValueType>& other) const {
+        return m_key == other.m_key && m_value == other.m_value;
+    }
 };
+
 
 // HashMap class with integer keys and generic values
 template<typename ValueType>
 class HashMap {
 private:
-    HashBucket<ValueType>* buckets; // Array of hash buckets
+    List<HashNode<ValueType>>* m_buckets; 
 
-    int size;
-    int capacity;
+    int m_size;
+    int m_capacity;
 
     static constexpr int INITIAL_CAPACITY = 10007; // Prime number for initial capacity
 
@@ -36,123 +39,174 @@ private:
     void expand_table();
 
 public:
+
+    // Constructor and destructor
     HashMap();
+
     ~HashMap();
 
     // Add a key-value pair to the hash map
-    void insert(int key, ValueType* value); // Changed parameter type
+    void insert(int key, ValueType* value); // Ensure ValueType* is used correctly
 
     // Retrieve values associated with a key
-    ValueType* get_values(int key) const; // Changed return type
+    ValueType* get_value(int key) const;
+
+    // Retrieve values associated with a key
+    ValueType* remove_and_get_values(int key);
 
     // Check if a key exists in the hash map
     bool contains(int key) const;
 
     // Remove a specific key-value pair
-    void remove_pair(int key, ValueType* value); // Changed parameter type
+    bool remove_pair(int key, ValueType* value);
 
     // Get the number of key-value pairs in the hash map
     int get_size() const;
 
     // Check if we have duplicates with the same key
     bool check_duplicates(const int key) const;
+
+    // Delete all nodes in the hash map
+    void delate_all_nodes();
 };
 
 // Implementations
 
 template<typename ValueType>
-HashMap<ValueType>::HashMap() : size(0), capacity(INITIAL_CAPACITY) {
-    buckets = new HashBucket<ValueType>[capacity];
+HashMap<ValueType>::HashMap() : m_size(0), m_capacity(INITIAL_CAPACITY) {
+    m_buckets = new List<HashNode<ValueType>>[m_capacity];
 }
 
 template<typename ValueType>
 HashMap<ValueType>::~HashMap() {
-    delete[] buckets;
+    delate_all_nodes();
+    delete[] m_buckets;
 }
 
 template<typename ValueType>
 int HashMap<ValueType>::compute_hash(int key) const {
-    // Ensures that negative keys are handled correctly by mapping them within [0, capacity-1]
-    return ((key % capacity) + capacity) % capacity;
+    // Ensure positive index within capacity
+    return ((key % m_capacity) + m_capacity) % m_capacity;
 }
 
 template<typename ValueType>
 void HashMap<ValueType>::expand_table() {
-    int old_capacity = capacity;
-    capacity *= 2;
-    HashBucket<ValueType>* new_buckets = new HashBucket<ValueType>[capacity];
+    int old_capacity = m_capacity;
+    m_capacity *= 2;
+    List<HashNode<ValueType>>* new_buckets = new List<HashNode<ValueType>>[m_capacity];
 
     for (int i = 0; i < old_capacity; ++i) {
-        if (buckets[i].occupied) {
-            for (auto& valPtr : buckets[i].values) {
-                int new_index = compute_hash(buckets[i].key);
-                if (!new_buckets[new_index].occupied) {
-                    new_buckets[new_index].key = buckets[i].key;
-                    new_buckets[new_index].occupied = true;
-                }
-                new_buckets[new_index].values.push_back(valPtr);
+        // Traverse the existing bucket
+        for(auto& node : m_buckets[i]){
+            if(node.m_key != 0 || node.m_value != nullptr){
+                int new_index = compute_hash(node.m_key);
+                new_buckets[new_index].push_back(node);
             }
         }
     }
 
-    delete[] buckets;
-    buckets = new_buckets;
+    delete[] m_buckets;
+    m_buckets = new_buckets;
 }
 
 template<typename ValueType>
-void HashMap<ValueType>::insert(int key, ValueType* value) { // Changed parameter type
-    if (static_cast<float>(size) / capacity > 0.75f) {
+void HashMap<ValueType>::insert(int key, ValueType* value) {
+    if (static_cast<float>(m_size) / m_capacity > 0.75f) {
         expand_table();
     }
 
     int index = compute_hash(key);
-    if (buckets[index].occupied && buckets[index].key == key) {
-        buckets[index].values.push_back(value);
-        size++;
-    } else {
-        buckets[index].key = key;
-        buckets[index].values.push_back(value);
-        buckets[index].occupied = true;
-        size++;
+    for(auto& node : m_buckets[index]){
+        if(node.m_key == key){
+            node.m_value = value;
+            return;
+        }
     }
+
+    HashNode<ValueType> new_node;
+    new_node.m_key = key;
+    new_node.m_value = value;
+    m_buckets[index].push_back(new_node);
+    m_size++;
 }
 
 template<typename ValueType>
-ValueType* HashMap<ValueType>::get_values(int key) const { // Changed return type
+ValueType* HashMap<ValueType>::get_value(int key) const {
     int index = compute_hash(key);
-    if (buckets[index].occupied && buckets[index].key == key) {
-        if (buckets[index].values.size() == 1) { // Check if only one entry exists
-            return *buckets[index].values.begin(); // Return the first ValueType* if exists
+    for(const auto& node : m_buckets[index]){
+        if(node.m_key == key){
+            return node.m_value;
         }
     }
-    return nullptr; // Return nullptr if not exactly one entry found
+    return nullptr;
+}
+
+template<typename ValueType>
+ValueType* HashMap<ValueType>::remove_and_get_values(int key) {
+    int index = compute_hash(key);
+    for(auto it = m_buckets[index].begin(); it != m_buckets[index].end(); ++it){
+        if((*it).m_key == key){
+            ValueType* value = (*it).m_value;
+            m_buckets[index].remove(*it);
+            m_size--;
+            return value;
+        }
+    }
+    return nullptr;
 }
 
 template<typename ValueType>
 bool HashMap<ValueType>::contains(int key) const {
     int index = compute_hash(key);
-    return buckets[index].occupied && buckets[index].key == key;
+    for(const auto& node : m_buckets[index]){
+        if(node.m_key == key){
+            return true;
+        }
+    }
+    return false;
 }
 
 template<typename ValueType>
-void HashMap<ValueType>::remove_pair(int key, ValueType* value) { // Changed parameter type
+bool HashMap<ValueType>::remove_pair(int key, ValueType* value) {
     int index = compute_hash(key);
-    if (buckets[index].occupied) {
-        buckets[index].values.remove(value);
-        if (buckets[index].values.empty()) {
-            buckets[index].occupied = false;
-            size--;
+    for(auto it = m_buckets[index].begin(); it != m_buckets[index].end(); ++it){
+        if((*it).m_key == key && (*it).m_value == value){
+            m_buckets[index].remove(*it);
+            m_size--;
+            return true;
         }
     }
+    return false;
 }
 
 template<typename ValueType>
 int HashMap<ValueType>::get_size() const {
-    return size;
+    return m_size;
 }
 
 template<typename ValueType>
 bool HashMap<ValueType>::check_duplicates(const int key) const {
     int index = compute_hash(key);
-    return buckets[index].values.size() > 1;
+    int count = 0;
+    for(const auto& node : m_buckets[index]){
+        if(node.m_key == key){
+            count++;
+            if(count > 1){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+template<typename ValueType>
+void HashMap<ValueType>::delate_all_nodes() {
+    for(int i = 0; i < m_capacity; ++i){
+        for(auto& node : m_buckets[i]){
+            if(node.m_value != nullptr){
+                delete node.m_value;
+            }
+        }
+    }
 }

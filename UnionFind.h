@@ -1,189 +1,292 @@
-#ifndef UNIONFIND_H
-#define UNIONFIND_H
+#pragma once
 
 #include "HashMap.h"
 #include "Participant.h"
 #include <memory>
+#include <iostream>
 
 using namespace std;
 
+template <typename Jockey, typename Team>
 class UnionFind {
-private:
-    class Node {
-    public:
-        int id;
-        int record;
-        bool isTeam;
-        Node* parent;
-        shared_ptr<Participant> participant;
+public:
+    struct Node {
+        shared_ptr<Participant> data;  // Pointer to the actual object (jockey, Team)
+        Node* parent;            // Raw pointer to the parent node
+        int size;               // Score of the team
 
-        Node(int id, bool isTeam) : id(id), record(0), isTeam(isTeam), parent(nullptr), participant(nullptr) {}
-        
-        Node* findRoot() {
-            if (parent == nullptr) {
-                return this;
-            }
-            parent = parent->findRoot();
-            return parent;
+        Node(const shared_ptr<Participant>& data) : data(data), parent(nullptr), size(0) {}
+
+        bool operator==(const Node& other) const {
+            return data == other.data;
         }
     };
 
-    HashMap<Node> teamMap;
-    HashMap<Node> jockeyMap;
+private:
+    HashMap<Node> m_jockey_map;  // Hash table of pointers to jockey nodes
+    HashMap<Node> m_team_map;    // Hash table of pointers to Team nodes
 
-    int size;
-    int maxSize;
-
-    Node* findRoot(Node* node);
-    void linkNodes(Node* node1, Node* node2);
-
-    friend class Plains;
+    Node* find_root(Node* node) const;
 
 public:
+    // Constructor: initializes an empty union-find structure
     UnionFind();
+
     ~UnionFind();
 
-    void addTeam(int id);
-    bool addJockey(int jockeyId, int teamId);
-    bool updateMatch(int winnerId, int loserId);
-    bool teamsExist(int teamId1, int teamId2);
-    bool mergeTeams(int teamId1, int teamId2);
-    bool uniteByRecord(int record);
-    Node* getTeamNode(int teamId);
-    int getTeamOfJockey(int jockeyId);
-    int getJockeyRecord(int jockeyId);
-    Node* getJockeyNode(int jockeyId);
-    int fetchJockeyRecord(int jockeyId);
-    int fetchTeamRecord(int teamId);
+    // Finds the team that a given jockey (by ID) currently belongs to
+    shared_ptr<Team> find_jockey_team(int jockeyId) const;
+
+    // Finds the team that a given jockey (by ID) currently belongs to
+    Node* find_jockey_team_node(int jockeyId) const;
+
+    // Returns the jockey pointer if present in the structure
+    shared_ptr<Jockey> find_jockey(int jockeyId) const;
+
+    // Finds the root team of the given teamId (just the "super-team")
+    shared_ptr<Team> find_real_team(int teamId) const;
+
+    // Finds the root team of the given teamId (just the "super-team")
+    Node* find_real_team_node(int teamId) const;
+
+    // Finds the root team of the given teamId (or the merged "super-team")
+    shared_ptr<Team> find_team(int teamId) const;
+
+    // Unites the set containing a jockey with the set containing a team
+    void unite_jockey_with_team(int jockeyId, int teamId);
+
+    // Merges two teams. Child is the team with the lower ranking
+    bool merge_teams(int childTeamId, int parentTeamId);
+
+    Node* merge_team_nodes(Node* childTeamNode, Node* parentTeamNode);
+
+    // Adds a new jockey to the union-find structure
+    bool add_jockey(const shared_ptr<Jockey>& jockey, const shared_ptr<Team>& team);
+
+    // Adds a new team to the union-find structure
+    bool add_team(const shared_ptr<Team>& team);
+
+    // Updates the match between two jockeys
+    bool update_match(int victoriousJockeyId, int losingJockeyId);
+
+    // Gets the group of a jockey
+    int get_team_jockey(int jockeyId) const;
+
+    // Unites teams by record
+    bool unite_by_record(int record);
+
+    // Gets the record of a jockey
+    int get_jockey_record(int jockeyId) const;
 };
 
 // Implementations
 
-UnionFind::UnionFind() : teamMap(), jockeyMap(), size(0), maxSize(0) {}
-
-UnionFind::~UnionFind() {
-    for (int i = 0; i < teamMap.get_size(); ++i) {
-        Node* node = teamMap.get_values(i);
-        delete node;
-    }
-    for (int i = 0; i < jockeyMap.get_size(); ++i) {
-        Node* node = jockeyMap.get_values(i);
-        delete node;
-    }
+template <typename Jockey, typename Team>
+UnionFind<Jockey, Team>::UnionFind() : m_jockey_map(), m_team_map() {
+    // The m_jockey_map and m_team_map are initialized using their default constructors
 }
 
-UnionFind::Node* UnionFind::findRoot(Node* node) {
-    if (node->parent == nullptr) {
-        return node;
+template <typename Jockey, typename Team>
+UnionFind<Jockey, Team>::~UnionFind() {
+    // Properly destroy HashMaps
+}
+
+template <typename Jockey, typename Team>
+typename UnionFind<Jockey, Team>::Node* UnionFind<Jockey, Team>::find_root(Node* node) const {
+    if (!node) {
+        return nullptr;
     }
-    node->parent = findRoot(node->parent);
+    if (node->parent != node) {
+        node = find_root(node->parent); // Path compression
+    }
     return node->parent;
 }
 
-void UnionFind::addTeam(int id) {
-    if (!teamMap.contains(id)) {
-        Node* newTeam = new Node(id, true);
-        teamMap.insert(id, newTeam);
+template <typename Jockey, typename Team>
+shared_ptr<Team> UnionFind<Jockey, Team>::find_jockey_team(int jockeyId) const {
+    Node* root = find_jockey_team_node(jockeyId);
+    if (!root) {
+        return nullptr;
+    }
+    return std::static_pointer_cast<Team>(root->data);
+}
+
+template <typename Jockey, typename Team>
+typename UnionFind<Jockey, Team>::Node* UnionFind<Jockey, Team>::find_jockey_team_node(int jockeyId) const {
+    Node* jockeyNode = m_jockey_map.get_value(jockeyId);
+    if (!jockeyNode) {
+        return nullptr;
+    }
+    Node* root = find_root(jockeyNode);
+    // The root is a Team node.
+    return root;
+}
+
+template <typename Jockey, typename Team>
+shared_ptr<Jockey> UnionFind<Jockey, Team>::find_jockey(int jockeyId) const {
+    Node* jockeyNode = m_jockey_map.get_value(jockeyId);
+    if (jockeyNode) {
+        return std::static_pointer_cast<Jockey>(jockeyNode->data);
+    }
+    return nullptr;
+}
+
+
+template <typename Jockey, typename Team>
+shared_ptr<Team> UnionFind<Jockey, Team>::find_real_team(int teamId) const {
+    Node* teamNode = m_team_map.get_value(teamId);
+    if (!teamNode) {
+        return nullptr;
+    }
+    if (teamNode->parent != teamNode) {
+        return nullptr;
+    }
+    return std::static_pointer_cast<Team>(teamNode->data);
+}
+
+template <typename Jockey, typename Team>
+typename UnionFind<Jockey, Team>::Node* UnionFind<Jockey, Team>::find_real_team_node(int teamId) const
+{
+    Node* teamNodePtr = m_team_map.get_value(teamId);
+    if (!teamNodePtr) {
+        return nullptr;
+    }
+    if (teamNodePtr->parent != teamNodePtr) {
+        return nullptr;
+    }
+    return teamNodePtr;
+}
+
+
+template <typename Jockey, typename Team>
+shared_ptr<Team> UnionFind<Jockey, Team>::find_team(int teamId) const {
+    Node* teamNode = m_team_map.get_value(teamId);
+    if (!teamNode) {
+        return nullptr;
+    }
+    return std::static_pointer_cast<Team>(teamNode->data);
+}
+
+template <typename Jockey, typename Team>
+void UnionFind<Jockey, Team>::unite_jockey_with_team(int jockeyId, int teamId) {
+    Node* jockeyNode = m_jockey_map.get_value(jockeyId);
+    Node* teamNode  = m_team_map.get_value(teamId);
+
+    if (jockeyNode && teamNode) {
+        Node* rootJockey = find_root(jockeyNode);
+        Node* rootTeam  = find_root(teamNode);
+        // Attach the jockey's root directly to the team's root
+        rootJockey->parent = rootTeam;
+        rootTeam->size++;
     }
 }
 
-bool UnionFind::addJockey(int jockeyId, int teamId) {
-    if (!teamMap.contains(teamId) || jockeyMap.contains(jockeyId)) {
+template <typename Jockey, typename Team>
+bool UnionFind<Jockey, Team>::merge_teams(int childTeamId, int parentTeamId) {
+    Node* parentTeamNode = m_team_map.get_value(parentTeamId);
+    Node* childTeamNode = m_team_map.get_value(childTeamId);
+
+    if (!parentTeamNode || !childTeamNode) {
         return false;
     }
-    Node* teamNode = teamMap.get_values(teamId);
-    Node* newJockey = new Node(jockeyId, false);
-    jockeyMap.insert(jockeyId, newJockey);
-    linkNodes(findRoot(teamNode), findRoot(newJockey));
-    return true;
-}
 
-bool UnionFind::updateMatch(int winnerId, int loserId) {
-    Node* winner = getJockeyNode(winnerId);
-    Node* loser = getJockeyNode(loserId);
-    if (!winner || !loser) return false;
-
-    Node* rootWin = findRoot(winner);
-    Node* rootLose = findRoot(loser);
-    if (rootWin == rootLose) return false;
-
-    winner->record += 1;
-    loser->record -= 1;
-
-    if (rootWin->isTeam) {
-        rootWin->record += 1;
-    }
-    if (rootLose->isTeam) {
-        rootLose->record -= 1;
+    if(parentTeamNode->size < childTeamNode->size) {
+        swap(parentTeamId, childTeamId);
     }
 
-    return true;
+    Node* mergedTeam = merge_team_nodes(childTeamNode, parentTeamNode);
+    return mergedTeam != nullptr;
 }
 
-bool UnionFind::teamsExist(int teamId1, int teamId2) {
-    return teamMap.contains(teamId1) && teamMap.contains(teamId2);
+template <typename Jockey, typename Team>
+typename UnionFind<Jockey, Team>::Node* UnionFind<Jockey, Team>::merge_team_nodes(Node* childTeamNode, Node* parentTeamNode) {
+    if (!childTeamNode || !parentTeamNode) {
+        return nullptr;
+    }
+    // Find roots of each team
+    childTeamNode = find_root(childTeamNode);
+    parentTeamNode = find_root(parentTeamNode);
+
+    // If they are already in the same set, do nothing
+    if (childTeamNode == parentTeamNode) {
+        return nullptr;
+    }
+
+    childTeamNode->parent = parentTeamNode;
+
+    parentTeamNode->data->m_record += childTeamNode->data->m_record;
+
+    return parentTeamNode;
 }
 
-bool UnionFind::mergeTeams(int teamId1, int teamId2) {
-    Node* t1 = getTeamNode(teamId1);
-    Node* t2 = getTeamNode(teamId2);
-    if (!t1 || !t2) return false;
-    Node* r1 = findRoot(t1);
-    Node* r2 = findRoot(t2);
-    if (r1 == r2) return false;
-    linkNodes(r1, r2);
-    return true;
-}
+template <typename Jockey, typename Team>
+bool UnionFind<Jockey, Team>::add_jockey(const shared_ptr<Jockey>& jockey, const shared_ptr<Team>& team) {
+    if (!m_jockey_map.get_value(jockey->getId())) {
+        Node* newNode = new (std::nothrow) Node(jockey);  // Create a new node with raw pointer
+        if(!newNode) {
+            throw std::bad_alloc();
+        }
+        newNode->parent = newNode;  // Initially, the jockey is its own parent
+        m_jockey_map.insert(jockey->getId(), newNode->parent); // Use raw pointer
 
-bool UnionFind::uniteByRecord(int record) {
-    // Implementation as needed
+        // Unite the new jockey with the given team (team is the root)
+        unite_jockey_with_team(jockey->getId(), team->getId());
+
+        return true;
+    }
     return false;
 }
 
-UnionFind::Node* UnionFind::getTeamNode(int teamId) {
-    return teamMap.contains(teamId) ? teamMap.get_values(teamId) : nullptr;
-}
-
-int UnionFind::getTeamOfJockey(int jockeyId) {
-    Node* jockey = getJockeyNode(jockeyId);
-    if (!jockey) return -1;
-    Node* root = findRoot(jockey);
-    return root->isTeam ? root->id : -1;
-}
-
-int UnionFind::getJockeyRecord(int jockeyId) {
-    Node* jockey = getJockeyNode(jockeyId);
-    return jockey ? jockey->record : 0;
-}
-
-UnionFind::Node* UnionFind::getJockeyNode(int jockeyId) {
-    return jockeyMap.contains(jockeyId) ? jockeyMap.get_values(jockeyId) : nullptr;
-}
-
-int UnionFind::fetchJockeyRecord(int jockeyId) {
-    Node* jockey = getJockeyNode(jockeyId);
-    return jockey ? jockey->record : 0;
-}
-
-int UnionFind::fetchTeamRecord(int teamId) {
-    Node* team = getTeamNode(teamId);
-    return team ? findRoot(team)->record : 0;
-}
-
-void UnionFind::linkNodes(Node* rootA, Node* rootB) {
-    if (rootA->id < rootB->id) {
-        rootB->parent = rootA;
-        if (rootA->isTeam && rootB->isTeam) {
-            rootA->record += rootB->record;
-            rootB->record = 0; 
+template <typename Jockey, typename Team>
+bool UnionFind<Jockey, Team>::add_team(const shared_ptr<Team>& team) {
+    if (!m_team_map.get_value(team->getId())) {
+        Node* newNode = new (std::nothrow) Node(team);  // Create a new node with raw pointer
+        if(!newNode) {
+            throw std::bad_alloc();
         }
-    } else {
-        rootA->parent = rootB;
-        if (rootA->isTeam && rootB->isTeam) {
-            rootB->record += rootA->record;
-            rootA->record = 0; 
-        }
+        newNode->parent = newNode;  // Team is its own root
+        m_team_map.insert(team->getId(), newNode->parent); // Use raw pointer
+        return true;
     }
+    return false;
 }
 
-#endif // UNIONFIND_H
+template <typename Jockey, typename Team>
+bool UnionFind<Jockey, Team>::update_match(int victoriousJockeyId, int losingJockeyId) {
+    Node* winnerNode = m_jockey_map.get_value(victoriousJockeyId);
+    Node* loserNode = m_jockey_map.get_value(losingJockeyId);
+
+    if (!winnerNode || !loserNode) {
+        return false;
+    }
+
+    winnerNode->data->increase_record();
+    loserNode->data->decrease_record();
+
+    return true;
+}
+
+template <typename Jockey, typename Team>
+int UnionFind<Jockey, Team>::get_team_jockey(int jockeyId) const {
+    Node* jockeyNode = m_jockey_map.get_value(jockeyId);
+    if (!jockeyNode) {
+        return -1;
+    }
+    Node* root = find_root(jockeyNode);
+    return root->data->m_id;
+}
+
+template <typename Jockey, typename Team>
+bool UnionFind<Jockey, Team>::unite_by_record(int record) {
+    // Implement the logic to unite teams by record
+    return true;
+}
+
+template <typename Jockey, typename Team>
+int UnionFind<Jockey, Team>::get_jockey_record(int jockeyId) const {
+    Node* jockeyNode = m_jockey_map.get_value(jockeyId);
+    if (!jockeyNode) {
+        return -1;
+    }
+    return jockeyNode->data->m_record;
+}

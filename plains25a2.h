@@ -20,8 +20,8 @@
 
 class Plains {
 private:
-    UnionFind m_unionFind;
-    HashMap<UnionFind::Node> m_recordMap;
+    UnionFind<Jockey, Team> m_unionFind;
+    HashMap<UnionFind<Jockey, Team>::Node> m_record_map;
 
 public:
     // <DO-NOT-MODIFY> {-----------------
