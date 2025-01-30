@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <cmath>
+#include <iostream>
 
 #include "List.h"
 
@@ -13,7 +14,7 @@ struct HashNode {
     int m_key;
     ValueType* m_value; 
 
-    HashNode() : m_key(0), m_value(nullptr) {} 
+    HashNode() : m_key(0), m_value(nullptr) {};
 
     bool operator==(const HashNode<ValueType>& other) const {
         return m_key == other.m_key && m_value == other.m_value;
@@ -68,6 +69,15 @@ public:
 
     // Delete all nodes in the hash map
     void delete_all_nodes();
+
+    void print(int key) const {
+        int index = compute_hash(key);
+        for(const auto& node : m_buckets[index]){
+            if(node.m_key == key){
+                cout << "Key: " << node.m_key << ", Value: " << node.m_value << endl;
+            }
+        }
+    }
 };
 
 // Implementations
@@ -172,10 +182,12 @@ template<typename ValueType>
 bool HashMap<ValueType>::remove_pair(int key, ValueType* value) {
     int index = compute_hash(key);
     for(auto it = m_buckets[index].begin(); it != m_buckets[index].end(); ++it){
-        if((*it).m_key == key && (*it).m_value == value){
-            m_buckets[index].remove(*it);
-            m_size--;
-            return true;
+        if((*it).m_key == key){
+            if((*it).m_value == value){
+                m_buckets[index].remove(*it);
+                m_size--;
+                return true;
+            }
         }
     }
     return false;

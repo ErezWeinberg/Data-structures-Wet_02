@@ -94,9 +94,11 @@ StatusType Plains::add_jockey(int jockeyId, int teamId){
 // Time complexity: O(log* m) on average over the input evaluated together with merge_teams and unite_by_record.
 StatusType Plains::update_match(int victoriousJockeyId, int losingJockeyId){
     try{
+        // Check for invalid inputs
         if(victoriousJockeyId <= 0 || losingJockeyId <= 0 || victoriousJockeyId == losingJockeyId){
             return StatusType::INVALID_INPUT;
         }
+        // Check if the jockeys exist and are in different teams and to update the records
         GenericNode<Jockey, Team>* victorious_jockey_node = m_jockey_map.get_value(victoriousJockeyId);
         GenericNode<Jockey, Team>* losing_jockey_node = m_jockey_map.get_value(losingJockeyId);
         if(victorious_jockey_node == nullptr || losing_jockey_node == nullptr || find_root(victorious_jockey_node) == find_root(losing_jockey_node)){
@@ -190,10 +192,12 @@ StatusType Plains::unite_by_record(int record)
             return StatusType::FAILURE;
         }
 
+
         // Find teams with the given record and -record
         GenericNode<Jockey, Team>* team1 = m_record_map.get_value(record);
         GenericNode<Jockey, Team>* team2 = m_record_map.get_value(-record);
 
+        
         if (!team1 || !team2) {
             return StatusType::FAILURE;
         }
