@@ -202,6 +202,11 @@ StatusType Plains::unite_by_record(int record)
             return StatusType::FAILURE;
         }
 
+        if(record == 5){
+            GenericNode<Jockey, Team>* team3 = m_record_map.get_value(15);
+            cout << "team1: " << team1->m_data->m_id << " team2: " << team2->m_data->m_id << " team3: " << team3->m_data->m_id << endl;
+        }
+
         return merge_teams(team1->m_data->m_id, team2->m_data->m_id);
 
     }catch(std::bad_alloc& e){

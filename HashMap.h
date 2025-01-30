@@ -3,7 +3,6 @@
 #include <functional>
 #include <memory>
 #include <cmath>
-#include <iostream>
 
 #include "List.h"
 
@@ -14,7 +13,7 @@ struct HashNode {
     int m_key;
     ValueType* m_value; 
 
-    HashNode() : m_key(0), m_value(nullptr) {};
+    HashNode() : m_key(0), m_value(nullptr) {} 
 
     bool operator==(const HashNode<ValueType>& other) const {
         return m_key == other.m_key && m_value == other.m_value;
@@ -68,16 +67,7 @@ public:
     bool check_duplicates(const int key) const;
 
     // Delete all nodes in the hash map
-    void delete_all_nodes();
-
-    void print(int key) const {
-        int index = compute_hash(key);
-        for(const auto& node : m_buckets[index]){
-            if(node.m_key == key){
-                cout << "Key: " << node.m_key << ", Value: " << node.m_value << endl;
-            }
-        }
-    }
+    void delate_all_nodes();
 };
 
 // Implementations
@@ -89,7 +79,6 @@ HashMap<ValueType>::HashMap() : m_size(0), m_capacity(INITIAL_CAPACITY) {
 
 template<typename ValueType>
 HashMap<ValueType>::~HashMap() {
-    delete[] m_buckets;
 }
 
 template<typename ValueType>
@@ -169,29 +158,25 @@ bool HashMap<ValueType>::contains(int key) const {
     int index = compute_hash(key);
     for(const auto& node : m_buckets[index]){
         if(node.m_key == key){
-            if(node.m_value != nullptr){
-                return true;
-            }
-            return false;
+            return true;
         }
     }
     return false;
 }
 
 template<typename ValueType>
-bool HashMap<ValueType>::remove_pair(int key, ValueType* value) {
+bool HashMap<ValueType>::remove_pair(int key, ValueType* node) {
     int index = compute_hash(key);
     for(auto it = m_buckets[index].begin(); it != m_buckets[index].end(); ++it){
-        if((*it).m_key == key){
-            if((*it).m_value == value){
-                m_buckets[index].remove(*it);
-                m_size--;
-                return true;
-            }
+        if(it->m_key == key && it->m_value == node){
+            m_buckets[index].remove(*it);
+            m_size--;
+            return true;
         }
     }
     return false;
 }
+
 
 template<typename ValueType>
 int HashMap<ValueType>::get_size() const {
@@ -214,13 +199,3 @@ bool HashMap<ValueType>::check_duplicates(const int key) const {
 }
 
 
-// template<typename ValueType>
-// void HashMap<ValueType>::delete_all_nodes() {
-//     for(int i = 0; i < m_capacity; ++i){
-//         for(auto& node : m_buckets[i]){
-//             if(node.m_value != nullptr){
-//                 delete node;
-//             }
-//         }
-//     }
-// }
