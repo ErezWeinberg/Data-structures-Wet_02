@@ -67,7 +67,7 @@ public:
     bool check_duplicates(const int key) const;
 
     // Delete all nodes in the hash map
-    void delate_all_nodes();
+    void delete_all_nodes();
 };
 
 // Implementations
@@ -79,7 +79,6 @@ HashMap<ValueType>::HashMap() : m_size(0), m_capacity(INITIAL_CAPACITY) {
 
 template<typename ValueType>
 HashMap<ValueType>::~HashMap() {
-    delate_all_nodes();
     delete[] m_buckets;
 }
 
@@ -160,7 +159,10 @@ bool HashMap<ValueType>::contains(int key) const {
     int index = compute_hash(key);
     for(const auto& node : m_buckets[index]){
         if(node.m_key == key){
-            return true;
+            if(node.m_value != nullptr){
+                return true;
+            }
+            return false;
         }
     }
     return false;
@@ -200,13 +202,13 @@ bool HashMap<ValueType>::check_duplicates(const int key) const {
 }
 
 
-template<typename ValueType>
-void HashMap<ValueType>::delate_all_nodes() {
-    for(int i = 0; i < m_capacity; ++i){
-        for(auto& node : m_buckets[i]){
-            if(node.m_value != nullptr){
-                delete node.m_value;
-            }
-        }
-    }
-}
+// template<typename ValueType>
+// void HashMap<ValueType>::delete_all_nodes() {
+//     for(int i = 0; i < m_capacity; ++i){
+//         for(auto& node : m_buckets[i]){
+//             if(node.m_value != nullptr){
+//                 delete node;
+//             }
+//         }
+//     }
+// }
