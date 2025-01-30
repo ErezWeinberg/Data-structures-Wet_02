@@ -114,11 +114,6 @@ public:
         }
     }
 
-
-    // void remove_by_iterator(Iterator it) {
-        
-    // }
-
     // Iterator implementation
     class Iterator {
     private:
