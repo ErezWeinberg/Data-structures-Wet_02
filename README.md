@@ -2,7 +2,6 @@
 
 ## Course Information
 - **Course:** 234218 Data Structures 1
-- **Semester:** 2025A (Winter)
 - **Assignment:** Wet Exercise #2
 
 ## Project Overview
